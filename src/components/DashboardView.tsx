@@ -30,6 +30,7 @@ import {
 } from './ActionModals';
 import { FileIcon } from './FileIcon';
 import { FilePreviewModal } from './FilePreviewModal';
+import { InstallAppButton } from './InstallAppButton';
 
 interface DashboardViewProps {
   member: AuthMember;
@@ -219,10 +220,13 @@ export function DashboardView({
             </div>
           </div>
 
-          <button type="button" className="logout-btn" onClick={onLogout}>
-            <LogOut size={16} />
-            <span>Logout</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <InstallAppButton variant="header" />
+            <button type="button" className="logout-btn" onClick={onLogout}>
+              <LogOut size={16} />
+              <span>Logout</span>
+            </button>
+          </div>
         </div>
 
         <div className="search-bar-wrap">

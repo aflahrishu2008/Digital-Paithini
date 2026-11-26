@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { AlertCircle, Eye, EyeOff, FolderHeart, Lock } from 'lucide-react';
+import { InstallAppButton } from './InstallAppButton';
 
 interface LoginViewProps {
   mode: 'supabase' | 'local-preview';
@@ -106,6 +107,8 @@ export function LoginView({ mode, onLogin }: LoginViewProps) {
           </div>
         )}
       </div>
+
+      <InstallAppButton variant="card" />
     </div>
   );
 }
