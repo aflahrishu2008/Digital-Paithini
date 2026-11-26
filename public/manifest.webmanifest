@@ -1,0 +1,19 @@
+{
+  "name": "Digital Paithini",
+  "short_name": "Paithini",
+  "description": "Private shared file and folder workspace for Digital Paithini.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f6f8f7",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
