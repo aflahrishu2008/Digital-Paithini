@@ -1,5 +1,5 @@
 -- Digital Paithini — Supabase Database & Storage Setup
--- Run this script once in Supabase Dashboard -> SQL Editor.
+-- Run this script once in Supabase Dashboard -> SQL Editor (or apply as migration).
 
 -- 1. Enable UUID extension if needed
 create extension if not exists pgcrypto;
@@ -27,11 +27,14 @@ create table if not exists public.items (
 create index if not exists idx_items_parent_id on public.items(parent_id);
 create index if not exists idx_items_type_updated_at on public.items(type, updated_at desc);
 create index if not exists idx_items_name_lower on public.items(lower(name));
+create index if not exists idx_items_created_by on public.items(created_by);
 
--- 3. Auto-update updated_at timestamp
+-- 3. Auto-update updated_at timestamp (fixed search_path for security)
 create or replace function public.handle_items_updated_at()
 returns trigger
 language plpgsql
+security invoker
+set search_path = ''
 as $$
 begin
   new.updated_at = now();
@@ -46,6 +49,9 @@ for each row
 execute function public.handle_items_updated_at();
 
 -- 4. Row Level Security (private: authenticated members only, equal permissions)
+revoke all on table public.items from anon;
+grant select, insert, update, delete on table public.items to authenticated;
+
 alter table public.items enable row level security;
 
 drop policy if exists "Authenticated members can read all shared items" on public.items;
@@ -53,31 +59,46 @@ create policy "Authenticated members can read all shared items"
 on public.items
 for select
 to authenticated
-using (true);
+using ((select auth.uid()) is not null);
 
 drop policy if exists "Authenticated members can create shared items" on public.items;
 create policy "Authenticated members can create shared items"
 on public.items
 for insert
 to authenticated
-with check (true);
+with check ((select auth.uid()) is not null);
 
 drop policy if exists "Authenticated members can update all shared items" on public.items;
 create policy "Authenticated members can update all shared items"
 on public.items
 for update
 to authenticated
-using (true)
-with check (true);
+using ((select auth.uid()) is not null)
+with check ((select auth.uid()) is not null);
 
 drop policy if exists "Authenticated members can delete all shared items" on public.items;
 create policy "Authenticated members can delete all shared items"
 on public.items
 for delete
 to authenticated
-using (true);
+using ((select auth.uid()) is not null);
 
--- 5. Private shared storage bucket
+-- 5. Enable Realtime updates for public.items
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'items'
+  ) then
+    alter publication supabase_realtime add table public.items;
+  end if;
+end
+$$;
+
+-- 6. Private shared storage bucket
 insert into storage.buckets (id, name, public)
 values ('digital-paithini-files', 'digital-paithini-files', false)
 on conflict (id) do update set public = false;
@@ -88,31 +109,31 @@ create policy "Authenticated members can view shared files"
 on storage.objects
 for select
 to authenticated
-using (bucket_id = 'digital-paithini-files');
+using (bucket_id = 'digital-paithini-files' and (select auth.uid()) is not null);
 
 drop policy if exists "Authenticated members can upload shared files" on storage.objects;
 create policy "Authenticated members can upload shared files"
 on storage.objects
 for insert
 to authenticated
-with check (bucket_id = 'digital-paithini-files');
+with check (bucket_id = 'digital-paithini-files' and (select auth.uid()) is not null);
 
 drop policy if exists "Authenticated members can update shared files" on storage.objects;
 create policy "Authenticated members can update shared files"
 on storage.objects
 for update
 to authenticated
-using (bucket_id = 'digital-paithini-files')
-with check (bucket_id = 'digital-paithini-files');
+using (bucket_id = 'digital-paithini-files' and (select auth.uid()) is not null)
+with check (bucket_id = 'digital-paithini-files' and (select auth.uid()) is not null);
 
 drop policy if exists "Authenticated members can delete shared files" on storage.objects;
 create policy "Authenticated members can delete shared files"
 on storage.objects
 for delete
 to authenticated
-using (bucket_id = 'digital-paithini-files');
+using (bucket_id = 'digital-paithini-files' and (select auth.uid()) is not null);
 
--- 6. Seed suggested initial folders (only when table is empty so deletions/renames stick)
+-- 7. Seed suggested initial folders (only when table is empty so deletions/renames stick)
 insert into public.items (name, type, parent_id)
 select folder_name, 'folder', null
 from (
